@@ -10,13 +10,20 @@ from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline
 from langchain_core.output_parsers import BaseOutputParser
 
 class ClassifyQuestion(BaseModel):
-    """Binary score for hallucination present in generation answer."""
+    """Question label to classify question for further processing"""
 
     question_label: str = Field(
         description="Question is of type 'general' or 'resource budget' or 'plan'"
     )
 
 class QuestionClassificationParser(BaseOutputParser):
+
     def parse(self, text: str) -> ClassifyQuestion:
+
         if "general" in text.lower():
             return ClassifyQuestion(question_label = "general")
+        
+        elif "resource budget" in text.lower():
+            return ClassifyQuestion(question_label = "resource budget")
+        
+        return ClassifyQuestion(question_label = "plan")
