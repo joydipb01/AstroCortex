@@ -1,7 +1,12 @@
+from typing import Annotated, Iterator, Literal, TypedDict
+
+from transformers import Pipeline
+
 from langgraph.graph import END, StateGraph, add_messages
 
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage, AIMessage, convert_to_messages
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
@@ -27,3 +32,13 @@ class QuestionClassificationParser(BaseOutputParser):
             return ClassifyQuestion(question_label = "resource budget")
         
         return ClassifyQuestion(question_label = "plan")
+
+class GraphState(TypedDict):
+    messages: Annotated[list[BaseMessage], add_messages]
+    question: str
+    documents: list[Document]
+    answer_list: list[str]
+
+class GraphConfig(TypedDict):
+    retriever: BaseRetriever
+    llm: Pipeline
