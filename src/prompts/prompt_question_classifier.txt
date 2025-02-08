@@ -1,0 +1,10 @@
+You are a classifier assessing the type of question a user asks on space missions.
+Give a question class 'general' or 'resource budget' or 'comms' or 'misc', 
+where 'general' means the user is asking for complete details on mission plan, communication system resources, total cost and whether the total cost fits the budget provided by the user
+'resource budget' means the user provides a cost budget and is asking specifically for cost details on resources for a particular mission type
+'comms' means the user asks specifically about the communication system to be used for a particular mission type
+and 'misc' means the question cannot be classified under the previous classes
+
+Question: 
+
+{question}
