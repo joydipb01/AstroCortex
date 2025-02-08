@@ -2,11 +2,12 @@ from typing import Annotated, Iterator, Literal, TypedDict
 
 from transformers import Pipeline
 
-from langgraph.graph import END, StateGraph, add_messages
+from langgraph.graph import START, END, StateGraph, MessagesState
 
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
+from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.messages import BaseMessage, AIMessage, convert_to_messages
 from langchain_core.prompts.prompt import PromptTemplate
 from pydantic import BaseModel, Field
@@ -36,11 +37,10 @@ class QuestionClassificationParser(BaseOutputParser):
         
         return ClassifyQuestion(question_label="misc")
 
-class GraphState(TypedDict):
-    messages: Annotated[list[BaseMessage], add_messages]
+class GraphState(MessagesState):
     question: str
     documents: list[Document]
-    answer_list: list[str]
+    answer_dict: dict
 
 class GraphConfig(TypedDict):
     retriever: BaseRetriever
@@ -57,6 +57,31 @@ def rephrase_question(state: GraphState, config: GraphConfig):
 
     return {"question": better_question}
 
+def get_relevant_documents(state: GraphState, config: GraphConfig):
+    retriever = config["configurable"]["retriever"]
+    question = state["question"]
+
+    relevant_documents = retriever.invoke(question)
+    
+    return {"documents": relevant_documents}
+
+
+def plan_resources_and_cost(state: GraphState, config: GraphConfig):
+    llm = config["configurable"]["llm"]
+    question = state["question"]
+    documents = state["documents"]
+    answer_dict = state["answer_dict"]
+
+    resource_cost_plan_prompt = PromptTemplate.from_file('prompts/prompt_resource_cost_plan.txt')
+
+    resource_lister = resource_cost_plan_prompt | llm | StrOutputParser()
+    resource_list = resource_lister.invoke({
+        "question": question,
+        "context": documents
+    })
+
+    answer_dict["resource_list"] = resource_list
+
 def classify_question(state: GraphState, config: GraphConfig):
     question = state["question"]
     llm = config["configurable"]["llm"]
@@ -70,6 +95,6 @@ def classify_question(state: GraphState, config: GraphConfig):
 
 workflow = StateGraph(GraphState, GraphConfig)
 
-workflow.add_node()
+workflow.add_node("rephraser", rephrase_question)
 
 graph = workflow.compile()
