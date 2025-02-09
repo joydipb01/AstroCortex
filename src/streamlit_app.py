@@ -57,4 +57,4 @@ with st.form(key="chat_form", clear_on_submit=True):
         inputs = {"messages": [HumanMessage(user_input)], "question": user_input, "answer_dict": {}}
         config = {"configurable": {"llm": llm, "retriever": retriever}}
         response = graph.invoke(inputs, config)
-        st.write(response["final_answer"])
+        st.write(response["finalizer"]["final_answer"])
