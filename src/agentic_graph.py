@@ -87,6 +87,19 @@ def get_relevant_documents(state: GraphState, config: GraphConfig):
     
     return {"documents": relevant_documents}
 
+def classify_question(state: GraphState, config: GraphConfig):
+    question = state["question"]
+    llm = config["configurable"]["llm"]
+
+    question_classifier_prompt = PromptTemplate.from_file('prompts/prompt_question_classifier.txt')
+
+    question_classifier = question_classifier_prompt | llm | QuestionClassificationParser()
+    question_classification: ClassifyQuestion = question_classifier.invoke(
+        {"question": question}
+    )
+
+    return {"question_class": question_classification.question_label}
+
 def plan_mission(state: GraphState, config: GraphConfig):
     llm = config["configurable"]["llm"]
     question = state["question"]
@@ -129,6 +142,7 @@ def plan_resources(state: GraphState, config: GraphConfig):
         resource_lister_ii = resource_budget_plan_prompt | llm | StrOutputParser()
         resource_list = resource_lister_ii.invoke({
             "question": question,
+            "mission": answer_dict["plan"],
             "resources": answer_dict["resource_list"],
             "context": documents
         })
@@ -167,7 +181,7 @@ def finalize_answer(state: GraphState, config: GraphConfig):
         "context": documents
     })
 
-    return {"messages": AIMessage(content=answer), "final_answer": answer}
+    return {"messages": [AIMessage(content=answer)], "final_answer": answer}
 
 # Conditional Edges:
 
@@ -190,23 +204,19 @@ def budget_resources(state: GraphState, config: GraphConfig):
 
     return budget_classification.binary_score
 
-def classify_question(state: GraphState, config: GraphConfig):
-    question = state["question"]
-    llm = config["configurable"]["llm"]
-
-    question_classifier_prompt = PromptTemplate.from_file('prompts/prompt_question_classifier.txt')
-
-    question_classifier = question_classifier_prompt | llm | QuestionClassificationParser()
-    question_classification: ClassifyQuestion = question_classifier.invoke(
-        {"question": question}
-    )
-
-    return {"question_class": question_classification.question_label}
 
 workflow = StateGraph(GraphState, GraphConfig)
 
 workflow.add_node("rephraser", rephrase_question)
+workflow.add_node("retriever", get_relevant_documents)
+workflow.add_node("get_question_class", classify_question)
+workflow.add_node("resource_planner", plan_resources)
+workflow.add_node("resource_costing", get_resource_cost)
+workflow.add_node("mission_planner", plan_mission)
+workflow.add_node("finalizer", finalize_answer)
 
 workflow.add_edge(START, "rephraser")
+workflow.add_edge("rephraser", "retriever")
+workflow.add_edge("finalizer", END)
 
 graph = workflow.compile()
