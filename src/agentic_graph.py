@@ -60,6 +60,7 @@ class GraphState(MessagesState):
     question_class: str
     documents: list[Document]
     answer_dict: dict
+    final_answer: str
 
 class GraphConfig(TypedDict):
     retriever: BaseRetriever
@@ -86,6 +87,26 @@ def get_relevant_documents(state: GraphState, config: GraphConfig):
     
     return {"documents": relevant_documents}
 
+def plan_mission(state: GraphState, config: GraphConfig):
+    llm = config["configurable"]["llm"]
+    question = state["question"]
+    documents = state["documents"]
+    answer_dict = state["answer_dict"]
+
+    mission_plan_prompt = PromptTemplate.from_file("prompt/prompt_mission_plan.txt")
+
+    mission_planner = mission_plan_prompt | llm | StrOutputParser()
+    mission_plan = mission_planner.invoke(
+        {
+            "question": question,
+            "resources": answer_dict["resource_list"],
+            "context": documents
+        }
+    )
+
+    answer_dict["plan"] = mission_plan
+
+    return {"answer_dict": answer_dict}
 
 def plan_resources(state: GraphState, config: GraphConfig):
     llm = config["configurable"]["llm"]
@@ -130,6 +151,23 @@ def get_resource_cost(state: GraphState, config: GraphConfig):
         documents.append(Document(page_content = search_content, metadata = {"source": "websearch"}))
     
     return {"documents": documents}
+
+def finalize_answer(state: GraphState, config: GraphConfig):
+    question = state["question"]
+    answer_dict = state["answer_dict"]
+    documents = state["documents"]
+    llm = config["configurable"]["llm"]
+
+    finalizer_prompt = PromptTemplate.from_file('prompts/prompt_response_finalizer.txt')
+
+    response_finalizer = finalizer_prompt | llm | StrOutputParser()
+    answer = response_finalizer.invoke({
+        "question": question,
+        "resources": answer_dict["resource_list"],
+        "context": documents
+    })
+
+    return {"messages": AIMessage(content=answer), "final_answer": answer}
 
 # Conditional Edges:
 

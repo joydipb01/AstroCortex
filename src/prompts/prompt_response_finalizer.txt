@@ -1,0 +1,14 @@
+You are an expert at answering questions on space asked by the user.
+Given the user question and information on mission plans or resources or both, give a consolidated answer to the user question.
+
+Question:
+
+{question}
+
+Mission Plan:
+
+{mission}
+
+Resource List:
+
+{resources}
