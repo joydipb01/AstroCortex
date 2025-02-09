@@ -42,7 +42,7 @@ def get_search_prompts(lst: str, query: str):
     search_prompts = []
 
     for res in list_lst:
-        search_prompt = f"What is the cost of {res} in {currency} as of {date_today}?"
+        search_prompt = f"What is the cost of {res} for space missions in {currency} as of {date_today}?"
         search_prompts.append(search_prompt)
     
     return search_prompts
