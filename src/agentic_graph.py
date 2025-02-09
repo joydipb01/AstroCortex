@@ -223,13 +223,13 @@ workflow.add_node("finalizer", finalize_answer)
 workflow.add_edge(START, "rephraser")
 workflow.add_edge("rephraser", "retriever")
 workflow.add_edge("retriever", "classify_question")
-workflow.add_edge("classify_question", "plan_resources")
-workflow.add_edge("plan_resources", "get_resource_cost")
-workflow.add_edge("plan_mission", "finalizer")
+workflow.add_edge("classify_question", "resource_planner")
+workflow.add_edge("resource_planner", "resource_costing")
+workflow.add_edge("mission_planner", "finalizer")
 workflow.add_edge("finalizer", END)
 
-workflow.add_conditional_edge(
-    "get_resource_cost", budget_resources, {"no": "plan_resources", "yes,gen": "plan_mission", "yes,res": "finalizer"}
+workflow.add_conditional_edges(
+    "resource_costing", budget_resources, {"no": "resource_planner", "yes,gen": "mission_planner", "yes,res": "finalizer"}
 )
 
 graph = workflow.compile()
