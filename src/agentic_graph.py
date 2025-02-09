@@ -188,6 +188,7 @@ def finalize_answer(state: GraphState, config: GraphConfig):
 def budget_resources(state: GraphState, config: GraphConfig):
     question = state["question"]
     documents = state["documents"]
+    question_class = state["question_class"]
     resource_list = state["answer_dict"]["resource_list"]
     llm = config["configurable"]["llm"]
 
@@ -202,14 +203,23 @@ def budget_resources(state: GraphState, config: GraphConfig):
         }
     )
 
+    if budget_classification.binary_score == "yes":
+        if question_class == "general":
+            return "yes,gen"
+        if question_class == "resource_budget":
+            return "yes,res"
+
     return budget_classification.binary_score
+
+def get_question_class(state: GraphState):
+    return state["question_class"]
 
 
 workflow = StateGraph(GraphState, GraphConfig)
 
 workflow.add_node("rephraser", rephrase_question)
 workflow.add_node("retriever", get_relevant_documents)
-workflow.add_node("get_question_class", classify_question)
+workflow.add_node("classify_question", classify_question)
 workflow.add_node("resource_planner", plan_resources)
 workflow.add_node("resource_costing", get_resource_cost)
 workflow.add_node("mission_planner", plan_mission)
@@ -217,6 +227,13 @@ workflow.add_node("finalizer", finalize_answer)
 
 workflow.add_edge(START, "rephraser")
 workflow.add_edge("rephraser", "retriever")
+workflow.add_edge("retriever", "classify_question")
+workflow.add_edge("classify_question", "plan_resources")
+workflow.add_edge("plan_resources", "get_resource_cost")
 workflow.add_edge("finalizer", END)
+
+workflow.add_conditional_edge(
+    "get_resource_cost", budget_resources, {"no": "plan_resources", "yes,gen": "plan_mission", "yes,res": "finalizer"}
+)
 
 graph = workflow.compile()
