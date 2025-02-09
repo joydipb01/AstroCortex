@@ -17,11 +17,13 @@ from langchain_core.retrievers import BaseRetriever
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline
 from langchain_core.output_parsers import BaseOutputParser
 
+# Data Models:
+
 class ClassifyQuestion(BaseModel):
     """Question label to classify question for further processing"""
 
     question_label: str = Field(
-        description="Question is of type 'general' or 'resource budget' or 'comms' or 'misc'"
+        description="Question is of type 'general' or 'resource budget' or 'misc'"
     )
 
 class QuestionClassificationParser(BaseOutputParser):
@@ -34,9 +36,6 @@ class QuestionClassificationParser(BaseOutputParser):
         elif "resource budget" in text.lower():
             return ClassifyQuestion(question_label = "resource budget")
         
-        elif "comms" in text.lower():
-            return ClassifyQuestion(question_label = "comms")
-        
         return ClassifyQuestion(question_label="misc")
 
 class ClassifyCostBudget(BaseModel):
@@ -46,19 +45,27 @@ class ClassifyCostBudget(BaseModel):
     )
 
 class BudgetClassificationParser(BaseOutputParser):
+
     def parse(Self, text: str) -> ClassifyCostBudget:
+
         if "yes" in text.lower():
             return ClassifyCostBudget(binary_score = "yes")
+        
         return ClassifyCostBudget(binary_score="no")
+
+# Graph Structure:
 
 class GraphState(MessagesState):
     question: str
+    question_class: str
     documents: list[Document]
     answer_dict: dict
 
 class GraphConfig(TypedDict):
     retriever: BaseRetriever
     llm: Pipeline
+
+# Graph Nodes
 
 def rephrase_question(state: GraphState, config: GraphConfig):
     question = state["question"]
@@ -86,13 +93,24 @@ def plan_resources(state: GraphState, config: GraphConfig):
     documents = state["documents"]
     answer_dict = state["answer_dict"]
 
-    resource_plan_prompt = PromptTemplate.from_file('prompts/prompt_resource_plan.txt')
+    if "resource_list" not in answer_dict.keys():
+        resource_plan_prompt = PromptTemplate.from_file('prompts/prompt_resource_plan.txt')
 
-    resource_lister = resource_plan_prompt | llm | StrOutputParser()
-    resource_list = resource_lister.invoke({
-        "question": question,
-        "context": documents
-    })
+        resource_lister = resource_plan_prompt | llm | StrOutputParser()
+        resource_list = resource_lister.invoke({
+            "question": question,
+            "context": documents
+        })
+    
+    else:
+        resource_budget_plan_prompt = PromptTemplate.from_file('prompts/prompt_resource_budget_plan.txt')
+
+        resource_lister_ii = resource_budget_plan_prompt | llm | StrOutputParser()
+        resource_list = resource_lister_ii.invoke({
+            "question": question,
+            "resources": answer_dict["resource_list"],
+            "context": documents
+        })
 
     answer_dict["resource_list"] = resource_list
 
@@ -112,6 +130,8 @@ def get_resource_cost(state: GraphState, config: GraphConfig):
         documents.append(Document(page_content = search_content, metadata = {"source": "websearch"}))
     
     return {"documents": documents}
+
+# Conditional Edges:
 
 def budget_resources(state: GraphState, config: GraphConfig):
     question = state["question"]
@@ -143,10 +163,12 @@ def classify_question(state: GraphState, config: GraphConfig):
         {"question": question}
     )
 
-    return question_classification.question_label
+    return {"question_class": question_classification.question_label}
 
 workflow = StateGraph(GraphState, GraphConfig)
 
 workflow.add_node("rephraser", rephrase_question)
+
+workflow.add_edge(START, "rephraser")
 
 graph = workflow.compile()
