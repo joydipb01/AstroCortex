@@ -2,6 +2,8 @@ from typing import Annotated, Iterator, Literal, TypedDict
 
 from transformers import Pipeline
 
+from utils import *
+
 from langgraph.graph import START, END, StateGraph, MessagesState
 
 from langchain_community.tools.tavily_search import TavilySearchResults
@@ -37,6 +39,18 @@ class QuestionClassificationParser(BaseOutputParser):
         
         return ClassifyQuestion(question_label="misc")
 
+class ClassifyCostBudget(BaseModel):
+
+    binary_score: str = Field(
+        description="List of resources meet the provided budget, 'yes' or 'no'"
+    )
+
+class BudgetClassificationParser(BaseOutputParser):
+    def parse(Self, text: str) -> ClassifyCostBudget:
+        if "yes" in text.lower():
+            return ClassifyCostBudget(binary_score = "yes")
+        return ClassifyCostBudget(binary_score="no")
+
 class GraphState(MessagesState):
     question: str
     documents: list[Document]
@@ -66,21 +80,57 @@ def get_relevant_documents(state: GraphState, config: GraphConfig):
     return {"documents": relevant_documents}
 
 
-def plan_resources_and_cost(state: GraphState, config: GraphConfig):
+def plan_resources(state: GraphState, config: GraphConfig):
     llm = config["configurable"]["llm"]
     question = state["question"]
     documents = state["documents"]
     answer_dict = state["answer_dict"]
 
-    resource_cost_plan_prompt = PromptTemplate.from_file('prompts/prompt_resource_cost_plan.txt')
+    resource_plan_prompt = PromptTemplate.from_file('prompts/prompt_resource_plan.txt')
 
-    resource_lister = resource_cost_plan_prompt | llm | StrOutputParser()
+    resource_lister = resource_plan_prompt | llm | StrOutputParser()
     resource_list = resource_lister.invoke({
         "question": question,
         "context": documents
     })
 
     answer_dict["resource_list"] = resource_list
+
+    return {"answer_dict": answer_dict}
+
+def get_resource_cost(state: GraphState, config: GraphConfig):
+    documents = state["documents"]
+    question = state["question"]
+    answer_dict = state["answer_dict"]
+    tavily_search_tool = TavilySearchResults(max_results=3)
+
+    search_questions = get_search_prompts(answer_dict["resource_list"], question)
+
+    for q in search_questions:
+        search_results = tavily_search_tool.invoke(q)
+        search_content = "\n".join([d["content"] for d in search_results])
+        documents.append(Document(page_content = search_content, metadata = {"source": "websearch"}))
+    
+    return {"documents": documents}
+
+def budget_resources(state: GraphState, config: GraphConfig):
+    question = state["question"]
+    documents = state["documents"]
+    resource_list = state["answer_dict"]["resource_list"]
+    llm = config["configurable"]["llm"]
+
+    budget_prompt = PromptTemplate.from_file('prompts/prompt_budgeting_resources.txt')
+
+    budget_classifier = budget_prompt | llm | BudgetClassificationParser()
+    budget_classification: ClassifyCostBudget = budget_classifier.invoke(
+        {
+            "question": question,
+            "resources": resource_list,
+            "context": documents
+        }
+    )
+
+    return budget_classification.binary_score
 
 def classify_question(state: GraphState, config: GraphConfig):
     question = state["question"]
@@ -89,9 +139,11 @@ def classify_question(state: GraphState, config: GraphConfig):
     question_classifier_prompt = PromptTemplate.from_file('prompts/prompt_question_classifier.txt')
 
     question_classifier = question_classifier_prompt | llm | QuestionClassificationParser()
-    question_label: ClassifyQuestion = question_classifier.invoke(
+    question_classification: ClassifyQuestion = question_classifier.invoke(
         {"question": question}
     )
+
+    return question_classification.question_label
 
 workflow = StateGraph(GraphState, GraphConfig)
 
