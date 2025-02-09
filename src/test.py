@@ -1,10 +1,19 @@
 from agentic_graph import graph
 from langchain_core.messages import HumanMessage
-from ChromaDB_HuggingFace import retriever
 from langchain_huggingface import HuggingFacePipeline
+from langchain.vectorstores import Chroma
+from langchain.embeddings import HuggingFaceEmbeddings
 
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig, pipeline
 import torch
+
+# Load Hugging Face embedding model
+embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+# Load the persisted ChromaDB retriever
+persist_directory = "db"
+vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding_model)
+retriever = vectordb.as_retriever(search_kwargs={"k": 2})
 
 MODEL_NAME = 'ankner/chat-llama3-1b-base-rm' # enter model name
 
