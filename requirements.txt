@@ -9,3 +9,4 @@ langgraph
 accelerate
 pypdf
 langchain-huggingface
+streamlit

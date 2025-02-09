@@ -1,7 +1,5 @@
 from typing import Annotated, Iterator, Literal, TypedDict
 
-from transformers import Pipeline
-
 from utils import *
 
 from langgraph.graph import START, END, StateGraph, MessagesState
@@ -9,12 +7,11 @@ from langgraph.graph import START, END, StateGraph, MessagesState
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
-from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_core.messages import BaseMessage, AIMessage, convert_to_messages
+from langchain_core.messages import AIMessage
 from langchain_core.prompts.prompt import PromptTemplate
 from pydantic import BaseModel, Field
 from langchain_core.retrievers import BaseRetriever
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline
+from langchain_huggingface import HuggingFacePipeline
 from langchain_core.output_parsers import BaseOutputParser
 
 # Data Models:
@@ -64,7 +61,7 @@ class GraphState(MessagesState):
 
 class GraphConfig(TypedDict):
     retriever: BaseRetriever
-    llm: Pipeline
+    llm: HuggingFacePipeline
 
 # Graph Nodes
 
