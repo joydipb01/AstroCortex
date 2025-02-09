@@ -10,3 +10,4 @@ accelerate
 pypdf
 langchain-huggingface
 streamlit
+chromadb
