@@ -15,7 +15,7 @@ persist_directory = "db"
 vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding_model)
 retriever = vectordb.as_retriever(search_kwargs={"k": 2})
 
-MODEL_NAME = 'ankner/chat-llama3-1b-base-rm' # enter model name
+MODEL_NAME = 'jayasuryajsk/Llama-3-1B' # enter model name
 
 model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.float16, trust_remote_code=True, device_map="auto")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
