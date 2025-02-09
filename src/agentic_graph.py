@@ -211,9 +211,7 @@ def budget_resources(state: GraphState, config: GraphConfig):
 
     return budget_classification.binary_score
 
-def get_question_class(state: GraphState):
-    return state["question_class"]
-
+# Defining the graph
 
 workflow = StateGraph(GraphState, GraphConfig)
 
@@ -230,6 +228,7 @@ workflow.add_edge("rephraser", "retriever")
 workflow.add_edge("retriever", "classify_question")
 workflow.add_edge("classify_question", "plan_resources")
 workflow.add_edge("plan_resources", "get_resource_cost")
+workflow.add_edge("plan_mission", "finalizer")
 workflow.add_edge("finalizer", END)
 
 workflow.add_conditional_edge(
