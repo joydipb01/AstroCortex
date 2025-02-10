@@ -63,10 +63,6 @@ retriever = vectordb.as_retriever(search_kwargs={"k": 2})
 
 docs = retriever.get_relevant_documents("What are key aspects of allotting resources on space missions?")
 
-docs
-
-os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"  
-
 from langchain.llms import CTransformers
 
 
